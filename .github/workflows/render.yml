@@ -15,7 +15,7 @@ on:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,6 +24,53 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Generate audio track
+        run: |
+          mkdir -p public
+          # Silent 60s base
+          ffmpeg -y -f lavfi -i "anullsrc=r=44100:cl=stereo" -t 60 public/_base.wav
+          # Effects
+          ffmpeg -y -f lavfi -i "sine=f=880:d=0.3" -af "volume=0.35" public/_ding_hi.wav
+          ffmpeg -y -f lavfi -i "sine=f=660:d=0.3" -af "volume=0.3" public/_ding_mid.wav
+          ffmpeg -y -f lavfi -i "sine=f=440:d=0.3" -af "volume=0.25" public/_ding_low.wav
+          ffmpeg -y -f lavfi -i "anoisesrc=d=0.5:c=white:a=0.4" -af "highpass=f=1500,volume=0.15" public/_whoosh.wav
+          ffmpeg -y -f lavfi -i "sine=f=220:d=2.5" -af "volume=0.2,afade=t=in:d=0.5,afade=t=out:st=1.5:d=1" public/_sweep.wav
+
+          # Mix everything at exact timestamps
+          ffmpeg -y \
+            -i public/_base.wav \
+            -itsoffset 2.0 -i public/_whoosh.wav \
+            -itsoffset 2.5 -i public/_ding_hi.wav \
+            -itsoffset 5.0 -i public/_ding_mid.wav \
+            -itsoffset 6.5 -i public/_ding_hi.wav \
+            -itsoffset 9.0 -i public/_ding_low.wav \
+            -itsoffset 12.0 -i public/_whoosh.wav \
+            -itsoffset 18.0 -i public/_ding_mid.wav \
+            -itsoffset 24.0 -i public/_whoosh.wav \
+            -itsoffset 25.0 -i public/_ding_hi.wav \
+            -itsoffset 29.0 -i public/_ding_hi.wav \
+            -itsoffset 33.0 -i public/_ding_hi.wav \
+            -itsoffset 36.0 -i public/_whoosh.wav \
+            -itsoffset 38.0 -i public/_ding_mid.wav \
+            -itsoffset 41.0 -i public/_ding_mid.wav \
+            -itsoffset 44.0 -i public/_ding_mid.wav \
+            -itsoffset 47.0 -i public/_ding_mid.wav \
+            -itsoffset 48.0 -i public/_whoosh.wav \
+            -itsoffset 48.5 -i public/_sweep.wav \
+            -itsoffset 54.0 -i public/_ding_hi.wav \
+            -itsoffset 57.0 -i public/_ding_low.wav \
+            -filter_complex "amix=inputs=21:duration=first:normalize=0[aout]" \
+            -map "[aout]" -t 60 \
+            public/audio.wav
+
+          rm public/_*.wav
+          ls -la public/
 
       - name: Install dependencies
         run: npm install
