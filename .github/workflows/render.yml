@@ -32,45 +32,89 @@ jobs:
 
       - name: Generate audio track
         run: |
+          set -e
           mkdir -p public
+          cd public
+
           # Silent 60s base
-          ffmpeg -y -f lavfi -i "anullsrc=r=44100:cl=stereo" -t 60 public/_base.wav
-          # Effects
-          ffmpeg -y -f lavfi -i "sine=f=880:d=0.3" -af "volume=0.35" public/_ding_hi.wav
-          ffmpeg -y -f lavfi -i "sine=f=660:d=0.3" -af "volume=0.3" public/_ding_mid.wav
-          ffmpeg -y -f lavfi -i "sine=f=440:d=0.3" -af "volume=0.25" public/_ding_low.wav
-          ffmpeg -y -f lavfi -i "anoisesrc=d=0.5:c=white:a=0.4" -af "highpass=f=1500,volume=0.15" public/_whoosh.wav
-          ffmpeg -y -f lavfi -i "sine=f=220:d=2.5" -af "volume=0.2,afade=t=in:d=0.5,afade=t=out:st=1.5:d=1" public/_sweep.wav
+          ffmpeg -y -f lavfi -i "anullsrc=r=44100:cl=stereo" -t 60 _base.wav
 
-          # Mix everything at exact timestamps
-          ffmpeg -y \
-            -i public/_base.wav \
-            -itsoffset 2.0 -i public/_whoosh.wav \
-            -itsoffset 2.5 -i public/_ding_hi.wav \
-            -itsoffset 5.0 -i public/_ding_mid.wav \
-            -itsoffset 6.5 -i public/_ding_hi.wav \
-            -itsoffset 9.0 -i public/_ding_low.wav \
-            -itsoffset 12.0 -i public/_whoosh.wav \
-            -itsoffset 18.0 -i public/_ding_mid.wav \
-            -itsoffset 24.0 -i public/_whoosh.wav \
-            -itsoffset 25.0 -i public/_ding_hi.wav \
-            -itsoffset 29.0 -i public/_ding_hi.wav \
-            -itsoffset 33.0 -i public/_ding_hi.wav \
-            -itsoffset 36.0 -i public/_whoosh.wav \
-            -itsoffset 38.0 -i public/_ding_mid.wav \
-            -itsoffset 41.0 -i public/_ding_mid.wav \
-            -itsoffset 44.0 -i public/_ding_mid.wav \
-            -itsoffset 47.0 -i public/_ding_mid.wav \
-            -itsoffset 48.0 -i public/_whoosh.wav \
-            -itsoffset 48.5 -i public/_sweep.wav \
-            -itsoffset 54.0 -i public/_ding_hi.wav \
-            -itsoffset 57.0 -i public/_ding_low.wav \
-            -filter_complex "amix=inputs=21:duration=first:normalize=0[aout]" \
-            -map "[aout]" -t 60 \
-            public/audio.wav
+          # Sound sources
+          ffmpeg -y -f lavfi -i "sine=f=55:d=0.9"  -af "volume=0.75,afade=t=out:st=0.1:d=0.8"   _impact.wav
+          ffmpeg -y -f lavfi -i "sine=f=110:d=0.7" -af "volume=0.55,afade=t=out:st=0.1:d=0.6"   _thud.wav
+          ffmpeg -y -f lavfi -i "sine=f=880:d=0.25" -af "volume=0.4,afade=t=out:st=0.05:d=0.2"  _dingH.wav
+          ffmpeg -y -f lavfi -i "sine=f=660:d=0.3"  -af "volume=0.35,afade=t=out:st=0.05:d=0.25" _dingM.wav
+          ffmpeg -y -f lavfi -i "sine=f=440:d=0.35" -af "volume=0.3,afade=t=out:st=0.05:d=0.3"   _dingL.wav
+          ffmpeg -y -f lavfi -i "sine=f=1760:d=0.2" -af "volume=0.3,afade=t=out:st=0.03:d=0.15"  _dingT.wav
+          ffmpeg -y -f lavfi -i "anoisesrc=d=0.5:c=white:a=0.6" -af "highpass=f=1500,lowpass=f=8000,volume=0.18,afade=t=in:d=0.05,afade=t=out:st=0.2:d=0.3" _whooshH.wav
+          ffmpeg -y -f lavfi -i "anoisesrc=d=0.6:c=pink:a=0.6"  -af "lowpass=f=1200,volume=0.25,afade=t=in:d=0.05,afade=t=out:st=0.3:d=0.3" _whooshL.wav
+          ffmpeg -y -f lavfi -i "sine=f=110:d=2.5" -af "volume=0.3,afade=t=in:d=0.4,afade=t=out:st=1.5:d=1" _sweepUp.wav
+          ffmpeg -y -f lavfi -i "sine=f=2200:d=0.06" -af "volume=0.35" _click.wav
+          ffmpeg -y -f lavfi -i "sine=f=1100:d=0.05" -af "volume=0.3"  _tick.wav
+          ffmpeg -y -f lavfi -i "sine=f=330:d=0.15"  -af "volume=0.25,afade=t=out:st=0.02:d=0.1" _snap.wav
+          ffmpeg -y -f lavfi -i "sine=f=55:d=4"      -af "volume=0.25,afade=t=in:d=1,afade=t=out:st=2:d=2" _drone.wav
 
-          rm public/_*.wav
-          ls -la public/
+          # (file | timestamp_ms) — one entry per sound event
+          entries=(
+            "_drone.wav|0"
+            "_whooshL.wav|1400"
+            "_tick.wav|2500"
+            "_dingH.wav|3500"
+            "_dingM.wav|5000"
+            "_dingH.wav|6500"
+            "_dingL.wav|9000"
+            "_whooshH.wav|12000"
+            "_click.wav|13500"
+            "_click.wav|14200"
+            "_click.wav|14900"
+            "_click.wav|15600"
+            "_click.wav|16300"
+            "_snap.wav|17000"
+            "_dingM.wav|18500"
+            "_sweepUp.wav|20000"
+            "_whooshL.wav|24000"
+            "_tick.wav|25000"
+            "_dingH.wav|26500"
+            "_tick.wav|28000"
+            "_dingH.wav|29500"
+            "_tick.wav|31000"
+            "_dingH.wav|32500"
+            "_whooshH.wav|36000"
+            "_thud.wav|38000"
+            "_dingM.wav|40000"
+            "_thud.wav|42000"
+            "_dingM.wav|44000"
+            "_impact.wav|46000"
+            "_whooshH.wav|48000"
+            "_impact.wav|49500"
+            "_sweepUp.wav|51000"
+            "_dingT.wav|54000"
+            "_dingH.wav|55500"
+            "_dingM.wav|57000"
+            "_thud.wav|58500"
+          )
+
+          inputs="-i _base.wav"
+          filter=""
+          idx=1
+          for entry in "${entries[@]}"; do
+            file="${entry%|*}"
+            ms="${entry#*|}"
+            inputs="$inputs -i $file"
+            filter="${filter}[$idx:a]adelay=${ms}|${ms}[a${idx}];"
+            idx=$((idx+1))
+          done
+
+          mix="[0:a]"
+          for ((i=1;i<idx;i++)); do
+            mix="${mix}[a${i}]"
+          done
+          filter="${filter}${mix}amix=inputs=${idx}:duration=first:normalize=0[aout]"
+
+          ffmpeg -y $inputs -filter_complex "$filter" -map "[aout]" -t 60 audio.wav
+
+          rm -f _*.wav
+          ls -la
 
       - name: Install dependencies
         run: npm install
